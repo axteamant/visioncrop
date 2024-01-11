@@ -1,4 +1,8 @@
 import pyautogui
+import tkinter as tk
+from openai import OpenAI
+from tkinter import scrolledtext, filedialog
+import os
 import argparse
 import numpy as np
 import cv2
@@ -6,6 +10,7 @@ from google.oauth2 import service_account
 from google.cloud import vision
 import argparse
 import cv2
+from tkinter import scrolledtext
 import io
 import argparse
 from enum import Enum
@@ -162,12 +167,6 @@ def get_document_bounds(image_file, feature):
     return bounds, document.text
 
 def render_doc_text(filein, fileout,file_name):
-    """Outlines document features (blocks, paragraphs, and words) given an image.
-
-    Args:
-        filein: path to the input image.
-        fileout: path to the output image.
-    """
     image = Image.open(filein)
     bounds, extracted_text = get_document_bounds(filein, FeatureType.WORD)
     draw_boxes(image, bounds, "yellow")
@@ -180,16 +179,84 @@ def render_doc_text(filein, fileout,file_name):
         image.save(fileout)
     else:
         image.show()
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Capture screen and extract text.")
-    parser.add_argument("--screen", type=int, default=0, help="Index of the screen to capture (default is 0)")
-    parser.add_argument("--file", type=str, default="default.txt", help="default out.txt")
-    parser.add_argument("--half", type=int, default=1, help="0 or 1")
-    args = parser.parse_args()
+    return extracted_text
+def cropAndSaveOut(half, image_path="out/output.png"):
+    if image_path =="out/output.png":
+        capture_screen(0,half)
+    cropper = ImageCropper(image_path)
+    return render_doc_text("out/cropped_image.png", "out/bounded.png","out/default.txt")
 
-    capture_screen(args.screen, args.half)
-    cropper = ImageCropper("out/output.png")
-    render_doc_text("out/cropped_image.png", "out/bounded.png","out/"+args.file )
-    
+import time
+def button1_click():
+    print(check_mark_var_addScreen.get())
+    if check_mark_var_addScreen.get() == False:
+        text_edit.delete("1.0", tk.END)
+    root.iconify()
+    if check_mark_var.get():
+        pyautogui.alert('Start screenshotProcess half screen')
+        time.sleep(1)
+    else:
+        pyautogui.alert('Start screenshotProcess full  screen')
+        time.sleep(1)
+    text_edit.insert(tk.END,   cropAndSaveOut( check_mark_var.get()))
+    root.deiconify()
 
+def buttonAI_click():
+    text_edit_out.delete("1.0", tk.END)
+    print("qui non dovrei entrare mai")
+    text_value = text_edit.get("1.0", tk.END)  # Recupera il valore del testo
+    completion = client.chat.completions.create(
+    model="gpt-3.5-turbo",
+    messages=[
 
+    {"role": "user","content": text_value}
+    ]
+)   
+    for x in completion.choices:
+
+        text_edit_out.insert(tk.END, x.message.content)
+        text_edit_out.insert(tk.END,"""
+                             
+############################################
+                             
+""")
+def button2_click():
+    print(check_mark_var_addScreen.get())
+    if check_mark_var_addScreen.get()== False:
+        text_edit.delete("1.0", tk.END)
+    text_edit.config(state=tk.NORMAL)
+    # Apre una finestra di dialogo per la selezione di un file
+    file_path = filedialog.askopenfilename(title="Seleziona un immagine", filetypes=[("immagine", "*.*")])
+    text_edit.insert(tk.END,   cropAndSaveOut( check_mark_var.get(), image_path=file_path))
+
+root = tk.Tk()
+root.title("VisionCrop v0.1")
+api_key= ""
+# Set the environment variable
+os.environ['OPENAI_API_KEY'] = api_key
+client = OpenAI()
+check_mark_var = tk.BooleanVar()
+check_mark_var.set(False)
+check_mark_var_addScreen = tk.BooleanVar()
+check_mark_var_addScreen.set(False)
+frame = tk.Frame(root)
+frame.pack()
+button1 = tk.Button(frame, text="ScreenShot", command=button1_click)
+button1.pack(side=tk.LEFT, pady=10, padx=10)
+button2 = tk.Button(frame, text="Load from File", command=button2_click)
+button2.pack(side=tk.LEFT, pady=10, padx=10)
+check_mark = tk.Checkbutton(frame, text="Half screen", variable=check_mark_var)
+check_mark.pack(side=tk.LEFT, padx=10)
+check_mark_1 = tk.Checkbutton(frame, text="append content", variable=check_mark_var_addScreen)
+check_mark_1.pack(side=tk.LEFT, padx=10)
+# Creazione del pulsante 2
+text_edit = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=100, height=10, state=tk.NORMAL)
+
+text_edit.pack(pady=10)
+text_edit_out = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=100, height=10, state=tk.NORMAL)
+text_edit_out.insert(tk.END,   "risposta AI")
+text_edit_out.pack(pady=10)
+button3 = tk.Button(frame, text="Ask to AI", command=buttonAI_click)
+button3.pack(side=tk.LEFT, pady=10, padx=10)
+# Esecuzione della finestra
+root.mainloop()
